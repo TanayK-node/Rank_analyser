@@ -78,13 +78,12 @@ def main():
             numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
             non_numeric_cols = list(set(df.columns) - set(numeric_cols))
             
-            # Data preprocessing options
-            st.sidebar.subheader("Data Preprocessing")
             name_col = st.sidebar.selectbox(
-                "Company Name Column", 
-                options=non_numeric_cols,
-                index=0
-            )
+            "Company Name Column", 
+            options=non_numeric_cols,
+            index=non_numeric_cols.index("Name") if "Name" in non_numeric_cols else 0
+        )
+
             
             # Sector/Industry analysis
             sector_col = None
@@ -152,7 +151,7 @@ def main():
                 st.session_state.metric_categories = {
                     'Sales': {
                         'weight': 0.7,
-                        'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['sales', 'growth'])]
+                        'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['sales'])]
                     },
                     'EPS': {
                         'weight': 1.2,
@@ -227,7 +226,7 @@ def main():
                 
                 st.session_state.metric_categories = new_categories
             
-            # Benchmark selection
+             #Benchmark selection
             st.sidebar.subheader("📊 Benchmark Options")
             benchmark = st.sidebar.selectbox(
                 "Select Benchmark Stock",
@@ -235,7 +234,7 @@ def main():
                 index=0
             )
             if benchmark != "None":
-                st.session_state.benchmark = benchmark
+                st.session_state.benchmark = benchmark 
             
             # Process data when user clicks the button
             # Process data when user clicks the button
@@ -257,8 +256,9 @@ def main():
                         if filter_sales and 'Sales' in df_processed.columns:
                             df_processed = df_processed[df_processed['Sales'] > min_sales]
                         
-                        # Drop rows with missing values in selected metrics
-                        df_processed.dropna(subset=selected_metrics, inplace=True)
+                        df_processed[selected_metrics] = df_processed[selected_metrics].apply(
+                        lambda col: col.where(pd.notnull(col), np.nan)
+                        )
                         
                         # Calculate ranks for each metric
                         for cat in st.session_state.metric_categories.values():
@@ -441,96 +441,67 @@ def main():
                         st.warning("Required metrics (ROE/Debt-to-Equity) not available for risk-reward analysis")
                 
                 with tab2:
-                     # Select company to analyze
-                    selected_company = st.selectbox(
-                        "Select Company to Analyze",
-                        options=df_processed[name_col].unique(),
-                        index=0
-                    )
-                    
-                    if selected_company:
-                        company_data = df_processed[df_processed[name_col] == selected_company].iloc[0]
-                        
-                       # Calculate contribution of each category to the score
-                        category_contributions = {}
-                        total_weight = sum(cat['weight'] for cat in st.session_state.metric_categories.values())
+                    st.subheader("Score Composition: Top 8 Companies")
+
+                    # Get top 8 companies by Score
+                    top_companies = df_processed.sort_values(by='Score', ascending=False).head(8)
+
+                    # Create a structure to hold contributions
+                    all_contributions = []
+
+                    total_weight = sum(cat['weight'] for cat in st.session_state.metric_categories.values())
+
+                    for _, row in top_companies.iterrows():
+                        company_name = row[name_col]
+                        company_contributions = {'Company': company_name}
 
                         for cat_name, cat_data in st.session_state.metric_categories.items():
                             if cat_data['metrics']:
-                                # Get average rank for this category
+                                # Get relevant rank columns
                                 rank_cols = [f'Rank_{col}' for col in cat_data['metrics'] if f'Rank_{col}' in df_processed.columns]
                                 if rank_cols:
-                                    avg_rank = company_data[rank_cols].mean()
-                                    # Contribution is (weight * (1 - normalized rank)) / total_weight
+                                    avg_rank = row[rank_cols].mean()
                                     contribution = (cat_data['weight'] * (1 - (avg_rank / len(df_processed)))) / total_weight
-                                    category_contributions[cat_name] = contribution * 100  # as percentage
+                                    company_contributions[cat_name] = contribution * 100  # as percentage
+                                else:
+                                    company_contributions[cat_name] = 0
+                            else:
+                                company_contributions[cat_name] = 0
 
-                        # Normalize contributions to sum exactly to 100%
-                        total_contribution = sum(category_contributions.values())
-                        if total_contribution > 0:
-                            normalized_contributions = {k: (v / total_contribution) * 100 for k, v in category_contributions.items()}
-                        else:
-                            normalized_contributions = category_contributions
+                        all_contributions.append(company_contributions)
 
-                        # Create pie chart
-                        if normalized_contributions:
-                            df_contributions = pd.DataFrame({
-                                'Category': normalized_contributions.keys(),
-                                'Contribution (%)': normalized_contributions.values()
-                            }).sort_values('Contribution (%)', ascending=False)
-                            
-                            fig = px.pie(
-                                df_contributions,
-                                names='Category',
-                                values='Contribution (%)',
-                                title=f"Score Composition for {selected_company} (Score: {company_data['Score']:.1f})",
-                                hover_data=['Contribution (%)'],
-                                labels={'Contribution (%)': 'Contribution %'}
-                            )
-                            
-                            # Update traces for consistent display
-                            fig.update_traces(
-                                hovertemplate="<b>%{label}</b><br>Contribution: %{value:.1f}%",
-                                texttemplate="%{label}<br>%{percent:.1%}",
-                                textposition='inside',
-                                insidetextorientation='radial'
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            
-                            # Show top contributing metrics
-                            st.write("**Top Contributing Metrics:**")
-                            
-                            # Get all metric contributions
-                            metric_contributions = []
-                            for cat_name, cat_data in st.session_state.metric_categories.items():
-                                for metric in cat_data['metrics']:
-                                    if f'Rank_{metric}' in df_processed.columns:
-                                        # Calculate metric contribution
-                                        rank = company_data[f'Rank_{metric}']
-                                        normalized_rank = 1 - (rank / len(df_processed))
-                                        contribution = (cat_data['weight'] * normalized_rank) / len(cat_data['metrics'])
-                                        metric_contributions.append({
-                                            'Metric': metric,
-                                            'Category': cat_name,
-                                            'Value': company_data[metric],
-                                            'Contribution': contribution * 100  # as percentage
-                                        })
-                            
-                            if metric_contributions:
-                                df_metric_contributions = pd.DataFrame(metric_contributions)
-                                df_metric_contributions = df_metric_contributions.sort_values('Contribution', ascending=False)
-                                
-                                # Show top 10 metrics
-                                st.dataframe(
-                                    df_metric_contributions.head(10).style.format({
-                                        'Value': '{:.2f}',
-                                        'Contribution': '{:.1f}%'
-                                    })
-                                )
-                        else:
-                            st.warning("Could not calculate score composition for this company")
+                    # Convert to DataFrame for plotting
+                    df_contrib = pd.DataFrame(all_contributions)
+
+                    # Melt the DataFrame for stacked bar chart
+                    df_melted = df_contrib.melt(id_vars='Company', var_name='Category', value_name='Contribution')
+
+                    # Sort by total score
+                    df_melted['Company'] = pd.Categorical(df_melted['Company'], 
+                                                        categories=top_companies[name_col].tolist(),
+                                                        ordered=True)
+
+                    # Plot stacked bar chart
+                    fig = px.bar(
+                        df_melted,
+                        x='Company',
+                        y='Contribution',
+                        color='Category',
+                        title="Category-wise Score Composition of Top 8 Companies",
+                        text_auto='.1f',
+                        labels={'Contribution': 'Contribution (%)'},
+                        height=500
+                    )
+
+                    fig.update_layout(
+                        barmode='stack',
+                        xaxis_title="Company",
+                        yaxis_title="Contribution (%)",
+                        legend_title="Metric Category"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
                 
                 # Create a risk-reward scatter plot
                 with tab3:
