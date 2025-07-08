@@ -152,26 +152,27 @@ def main():
                     'Sales': {
                         'weight': 0.7,
                         'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['sales'])]
-                    },
-                    'EPS': {
-                        'weight': 1.2,
-                        'metrics': [col for col in selected_metrics if 'eps' in col.lower()]
-                    },
+                    },                   
                     'Profit': {
                         'weight': 1.0,
-                        'metrics': [col for col in selected_metrics if 'profit' in col.lower()]
+                        'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['profit', 'eps'])]
+            
                     },
                     'Operational': {
                         'weight': 0.9,
                         'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['opm', 'npm', 'operating'])]
                     },
                     'Returns': {
-                        'weight': 1.1,
+                        'weight': 1.0,
                         'metrics': [col for col in selected_metrics if 'return' in col.lower()]
                     },
-                    'Efficiency': {
-                        'weight': 1.2,
-                        'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['ratio', 'debt', 'peg'])]
+                    'Efficiency ': {
+                        'weight': 1.0,
+                        'metrics': [
+                            col for col in selected_metrics
+                            if any(x in col.lower() for x in ['ratio', 'debt', 'peg'])
+                            and 'current ratio' not in col.lower()
+                        ]
                     }
                 }
             
@@ -191,7 +192,7 @@ def main():
                     weight = st.slider(
                         f"{cat} Weight",
                         min_value=0.1,
-                        max_value=2.0,
+                        max_value=1.0,
                         value=st.session_state.metric_categories[cat]['weight'],
                         step=0.1,
                         key=f"weight_{cat}"
@@ -214,7 +215,7 @@ def main():
                         new_cat_weight = st.slider(
                             f"{new_cat_name} Weight",
                             min_value=0.1,
-                            max_value=2.0,
+                            max_value=1.0,
                             value=1.0,
                             step=0.1,
                             key=f"new_weight_{new_cat_name}"
