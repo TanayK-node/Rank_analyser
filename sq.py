@@ -135,7 +135,7 @@ def main():
                 'OPM', 'NPM last year', 'QoQ Op Profit growth', '2QoQ op profit', 'Operating profit growth',
                 'Return on equity', 'Return on capital employed',
                 'Average return on capital employed 5Years', 'Return on assets',
-                'PEG Ratio', 'Debt to equity', 'Interest Coverage Ratio', 'Current ratio'
+                'PEG Ratio', 'Debt to equity', 'Interest Coverage Ratio', 'Current ratio','Market Capitalization','Net profit','Sales'
             ]
             
             # Let user select which columns to include
@@ -151,7 +151,7 @@ def main():
                 st.session_state.metric_categories = {
                     'Sales': {
                         'weight': 0.7,
-                        'metrics': [col for col in selected_metrics if any(x in col.lower() for x in ['sales'])]
+                        'metrics': [col for col in selected_metrics if 'sales' in col.lower() and col.lower().strip() != 'sales']
                     },                   
                     'Profit': {
                         'weight': 1.0,
