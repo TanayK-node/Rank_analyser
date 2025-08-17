@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from io import StringIO
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -569,13 +570,21 @@ def main():
                         else:
                             st.warning("No metrics selected for this category")
                 
+                today = datetime.now().strftime("%d-%m-%Y")
+
+                # Get industry from the dataframe (first row or unique value)
+                industry = df['Industry'].iloc[0]   # or df['industry'].unique()[0] if multiple
+
+                # Build file name
+                file_name = f"{industry}_{today}_stock_analysis.csv"
+                
                 # Download section
                 st.subheader("💾 Download Results")
                 csv = df_processed.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="Download Full Analysis (CSV)",
                     data=csv,
-                    file_name="stock_analysis_results.csv",
+                    file_name= file_name,
                     mime="text/csv"
                 )
         
